@@ -36,8 +36,11 @@ var ErrNotImplemented = errors.New("ble adapter not implemented")
 
 type NoopAdapter struct{}
 
-func NewAdapter() Adapter {
-	return &NoopAdapter{}
+func NewAdapter(bleInterface ...string) Adapter {
+	if len(bleInterface) > 0 {
+		return newPlatformAdapter(bleInterface[0])
+	}
+	return newPlatformAdapter("")
 }
 
 func (n *NoopAdapter) Scan(context.Context, string) ([]PeripheralInfo, error) {

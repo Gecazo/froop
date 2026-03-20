@@ -31,7 +31,7 @@ func main() {
 		defer st.Close()
 	}
 
-	adapter := device.NewAdapter()
+	adapter := device.NewAdapter(cfg.BLEInterface)
 	application := app.NewApplication(cfg, st, adapter)
 	if err := application.Run(context.Background()); err != nil {
 		log.Fatalf("%v", err)
