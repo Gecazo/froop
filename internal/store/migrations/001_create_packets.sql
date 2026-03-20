@@ -1,0 +1,13 @@
+-- +postgres
+CREATE TABLE IF NOT EXISTS packets (
+  id SERIAL PRIMARY KEY,
+  uuid UUID NOT NULL,
+  bytes BYTEA NOT NULL
+);
+
+-- +sqlite
+CREATE TABLE IF NOT EXISTS packets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uuid TEXT NOT NULL,
+  bytes BLOB NOT NULL
+);
