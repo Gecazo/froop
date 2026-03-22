@@ -1,0 +1,11 @@
+[package]
+name = "froop-wasm"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+froop-core = { path = "../froop-core" }
+
