@@ -1,86 +1,103 @@
-# OpenWhoop Go CLI (froop)
+# Froop
 
-A Go rewrite of the OpenWhoop CLI with parity for the current command set:
+Froop is a browser-first WHOOP client.
 
-- `scan`
-- `download-history`
-- `rerun`
-- `detect-events`
-- `sleep-stats`
-- `exercise-stats`
-- `calculate-stress`
-- `calculate-spo2`
-- `calculate-skin-temp`
-- `set-alarm`
-- `merge`
-- `restart`
-- `erase`
-- `version`
-- `enable-imu`
-- `sync`
-- `download-firmware`
-- `completions`
+The current MVP is a Chromium desktop web app that can:
+
+- connect to a WHOOP band with Web Bluetooth
+- subscribe to WHOOP BLE characteristics
+- send the initial WHOOP command sequence
+- capture raw packets
+- store sessions and packets in IndexedDB
+- export a captured session as JSON
+
+## Current status
+
+Working today:
+
+- Chromium desktop connection flow
+- WHOOP device selection through the browser picker
+- raw packet capture and local storage
+- local session export
+
+Not finished yet:
+
+- full packet decoding
+- full historical sync lifecycle handling
+- normalized heart-rate/history storage
+- data analysis UI
+
+## Browser support
+
+Supported target right now:
+
+- Google Chrome desktop
+
+May work:
+
+- Brave desktop
+- Microsoft Edge desktop
+
+Not a target right now:
+
+- Safari
+- Firefox
+- mobile browsers
+
+Web Bluetooth requires a secure context, so use `https://` or `localhost`.
+
+## Repo layout
+
+- [`crates/froop-core`](/Users/gecazo/Projects/froop/crates/froop-core): shared Rust protocol/session primitives
+- [`crates/froop-wasm`](/Users/gecazo/Projects/froop/crates/froop-wasm): browser-facing Rust wrapper for future WASM integration
+- [`web`](/Users/gecazo/Projects/froop/web): Vite frontend with Web Bluetooth and IndexedDB
+- [`docs/standalone-app-plan.md`](/Users/gecazo/Projects/froop/docs/standalone-app-plan.md): implementation notes and roadmap
+
+## Run locally
+
+Install frontend dependencies:
+
+```bash
+cd /Users/gecazo/Projects/froop/web
+npm install
+```
+
+Start the local app:
+
+```bash
+cd /Users/gecazo/Projects/froop/web
+npm run dev
+```
+
+Then open the local URL shown by Vite in Chrome.
 
 ## Build
 
-```bash
-go build ./cmd/openwhoop
-```
-
-## Global flags/env
-
-- `--database-url` / `DATABASE_URL`
-- `--debug-packets` / `DEBUG_PACKETS`
-- `--ble-interface` / `BLE_INTERFACE` (Linux compatibility only)
-
-## Command examples
+Frontend production build:
 
 ```bash
-openwhoop --database-url sqlite://./openwhoop.db scan
-openwhoop --database-url sqlite://./openwhoop.db download-history --whoop WHOOP_ID
-openwhoop --database-url sqlite://./openwhoop.db rerun
-openwhoop --database-url sqlite://./openwhoop.db detect-events
-openwhoop --database-url sqlite://./openwhoop.db sleep-stats
-openwhoop --database-url sqlite://./openwhoop.db exercise-stats
-openwhoop --database-url sqlite://./openwhoop.db calculate-stress
-openwhoop --database-url sqlite://./openwhoop.db calculate-spo2
-openwhoop --database-url sqlite://./openwhoop.db calculate-skin-temp
-openwhoop --database-url sqlite://./openwhoop.db set-alarm --whoop WHOOP_ID 5min
-openwhoop --database-url sqlite://./openwhoop.db merge sqlite://./other.db
-openwhoop --database-url sqlite://./openwhoop.db restart --whoop WHOOP_ID
-openwhoop --database-url sqlite://./openwhoop.db erase --whoop WHOOP_ID
-openwhoop --database-url sqlite://./openwhoop.db version --whoop WHOOP_ID
-openwhoop --database-url sqlite://./openwhoop.db enable-imu --whoop WHOOP_ID
-openwhoop --database-url sqlite://./openwhoop.db sync --remote postgres://user:pass@host/db
-openwhoop download-firmware --email you@example.com --password secret
-openwhoop completions bash
+cd /Users/gecazo/Projects/froop/web
+npm run build
 ```
 
-## Storage contract
-
-The v1 Go rewrite keeps the same storage workflow and table names:
-
-- `packets`
-- `heart_rate`
-- `sleep_cycles`
-- `activities`
-
-Migrations are SQL-based (`internal/store/migrations`) and are applied at startup via a thin migrator.
-SQLite and PostgreSQL are both supported.
-
-## Project layout
-
-- `cmd/openwhoop`: CLI entrypoint
-- `internal/config`: flags/env parsing
-- `internal/protocol`: frame/CRC/UUIDs/command builders
-- `internal/decoder`: packet decoding (`WhoopData` equivalents)
-- `internal/store`: `database/sql`, migrations, sync/upsert logic
-- `internal/algorithms`: sleep/activity/stress/SpO2/temp/strain
-- `internal/device`: BLE adapter interface and mock/noop implementations
-- `internal/app`: command orchestration and firmware API flow
-
-## Tests
+Rust checks:
 
 ```bash
-go test ./...
+cd /Users/gecazo/Projects/froop
+cargo test
 ```
+
+## How to test the MVP
+
+1. Open the app in Chrome on desktop.
+2. Click `Request Bluetooth Access`.
+3. Select the WHOOP device in the browser picker.
+4. Confirm packets begin increasing in the UI.
+5. Export the session JSON if you want to inspect the captured raw packets.
+
+## Next steps
+
+1. Port the packet decoder from `openwhoop` into the browser flow or WASM layer.
+2. Handle WHOOP history metadata and follow-up acknowledgements.
+3. Store decoded readings instead of only raw packets.
+4. Add analysis and visualization.
