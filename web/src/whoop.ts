@@ -31,6 +31,7 @@ const PacketType = {
 const CommandNumber = {
   SetClock: 10,
   SendHistoricalData: 22,
+  HistoricalDataResult: 23,
   GetHelloHarvard: 35,
   GetAdvertisingNameHarvard: 76,
   EnterHighFreqSync: 96,
@@ -44,6 +45,7 @@ export type WhoopNotification = {
 export type ConnectedWhoopDevice = {
   name: string;
   disconnect: () => void;
+  sendHistoryEndAck: (data: number) => Promise<void>;
 };
 
 type ConnectOptions = {
@@ -138,6 +140,14 @@ export async function connectToWhoop(
         device.gatt.disconnect();
       }
     },
+    sendHistoryEndAck: async (data: number) => {
+      await sendCommand(
+        commandCharacteristic,
+        buildHistoryEndAck(data),
+        "history_end_ack",
+        options,
+      );
+    },
   };
 }
 
@@ -185,6 +195,20 @@ function buildCommand(cmd: number, data: number[]): Uint8Array {
     (dataCrc >> 8) & 0xff,
     (dataCrc >> 16) & 0xff,
     (dataCrc >> 24) & 0xff,
+  ]);
+}
+
+function buildHistoryEndAck(data: number): Uint8Array {
+  return buildCommand(CommandNumber.HistoricalDataResult, [
+    0x01,
+    data & 0xff,
+    (data >> 8) & 0xff,
+    (data >> 16) & 0xff,
+    (data >> 24) & 0xff,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
   ]);
 }
 
