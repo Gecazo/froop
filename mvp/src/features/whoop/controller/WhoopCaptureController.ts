@@ -516,12 +516,10 @@ export class WhoopCaptureController {
     this.renderScheduled = true;
     this.renderTimer = window.setTimeout(() => {
       this.renderScheduled = false;
-      if (!this.isSyncHot() && this.state.lastPacket) {
-        this.lastRenderedPacket = this.state.lastPacket;
-        this.previewSuppressed = false;
-      } else if (!this.lastRenderedPacket && this.state.lastPacket) {
+      if (this.state.lastPacket) {
         this.lastRenderedPacket = this.state.lastPacket;
       }
+      this.previewSuppressed = this.isSyncHot();
 
       this.emit();
     }, WhoopCaptureController.RENDER_INTERVAL_MS);

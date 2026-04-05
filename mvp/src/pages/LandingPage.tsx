@@ -1,16 +1,11 @@
-import EastOutlinedIcon from '@mui/icons-material/EastOutlined';
 import {
   Box,
   Button,
-  Chip,
   LinearProgress,
   Paper,
   Stack,
   Typography
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
-
-import { APP_ROUTES } from '@/config/routes.ts';
 import { useWhoopCaptureController } from '@/features/whoop/index.ts';
 import { useDocumentTitle } from '@/shared/hooks/useDocumentTitle.ts';
 
@@ -23,58 +18,13 @@ const formatBytes = (bytes: readonly number[]): string => {
     .join(' ');
 };
 
-const capabilityLabel = (enabled: boolean): 'available' | 'missing' => {
-  return enabled ? 'available' : 'missing';
-};
-
-const capabilityColor = (enabled: boolean): 'success' | 'error' => {
-  return enabled ? 'success' : 'error';
-};
-
 export const LandingPage = () => {
-  const navigate = useNavigate();
-
   useDocumentTitle('Landing');
 
   const whoop = useWhoopCaptureController();
 
   return (
     <Box className={styles.page}>
-      <Box className={styles.heroPanel}>
-        <Typography className={styles.kicker} variant="overline">
-          Technical Brutalism / Environmental SaaS
-        </Typography>
-        <Typography className={styles.title} variant="h1">
-          Carbon Intelligence For The Built Environment.
-        </Typography>
-        <Typography className={styles.description} variant="body1">
-          Deploy an enterprise-grade frontend shell for life-cycle analysis, emissions diagnostics,
-          and operational decarbonization workflows.
-        </Typography>
-
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-          <Button
-            endIcon={<EastOutlinedIcon />}
-            onClick={() => {
-              navigate(APP_ROUTES.analysis);
-            }}
-            variant="contained"
-            size="large"
-          >
-            Open Analysis Workspace
-          </Button>
-          <Button
-            onClick={() => {
-              navigate(APP_ROUTES.settings);
-            }}
-            variant="outlined"
-            size="large"
-          >
-            Configure Platform
-          </Button>
-        </Stack>
-      </Box>
-
       <Box className={styles.capturePanel}>
         <Stack spacing={1}>
           <Typography className={styles.captureTitle} variant="h3">
@@ -130,46 +80,6 @@ export const LandingPage = () => {
         </Stack>
 
         <Box className={styles.captureGrid}>
-          <Paper className={styles.captureCard}>
-            <Typography className={styles.captureCardTitle} variant="h6">
-              Browser capability check
-            </Typography>
-            <Box className={styles.capabilityList}>
-              <Box className={styles.capabilityRow}>
-                <Typography>Chromium desktop (Chrome, Edge, Brave)</Typography>
-                <Chip
-                  color={capabilityColor(whoop.support.chromiumLike)}
-                  label={capabilityLabel(whoop.support.chromiumLike)}
-                  size="small"
-                />
-              </Box>
-              <Box className={styles.capabilityRow}>
-                <Typography>Secure context (HTTPS or localhost)</Typography>
-                <Chip
-                  color={capabilityColor(whoop.support.secureContext)}
-                  label={capabilityLabel(whoop.support.secureContext)}
-                  size="small"
-                />
-              </Box>
-              <Box className={styles.capabilityRow}>
-                <Typography>Web Bluetooth</Typography>
-                <Chip
-                  color={capabilityColor(whoop.support.bluetooth)}
-                  label={capabilityLabel(whoop.support.bluetooth)}
-                  size="small"
-                />
-              </Box>
-              <Box className={styles.capabilityRow}>
-                <Typography>IndexedDB</Typography>
-                <Chip
-                  color={capabilityColor(whoop.support.indexedDb)}
-                  label={capabilityLabel(whoop.support.indexedDb)}
-                  size="small"
-                />
-              </Box>
-            </Box>
-          </Paper>
-
           <Paper className={styles.captureCard}>
             <Typography className={styles.captureCardTitle} variant="h6">
               Current session
@@ -341,26 +251,6 @@ export const LandingPage = () => {
               )}
             </Box>
           </Paper>
-        </Box>
-      </Box>
-
-      <Box className={styles.metricsGrid}>
-        <Box className={styles.metricCard}>
-          <Typography variant="overline">Portfolio</Typography>
-          <Typography variant="h3">128</Typography>
-          <Typography color="text.secondary">Active assets connected</Typography>
-        </Box>
-
-        <Box className={styles.metricCard}>
-          <Typography variant="overline">Current Intensity</Typography>
-          <Typography variant="h3">26.7</Typography>
-          <Typography color="text.secondary">kgCO₂e/m² annualized</Typography>
-        </Box>
-
-        <Box className={styles.metricCard}>
-          <Typography variant="overline">Target Delta</Typography>
-          <Typography variant="h3">-42%</Typography>
-          <Typography color="text.secondary">By 2032 decarbonization objective</Typography>
         </Box>
       </Box>
     </Box>

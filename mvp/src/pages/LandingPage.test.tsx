@@ -1,24 +1,11 @@
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type * as ReactRouterDom from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { APP_ROUTES } from '@/config/routes.ts';
 import type { UseWhoopCaptureControllerResult } from '@/features/whoop/index.ts';
 import * as whoopFeature from '@/features/whoop/index.ts';
 import { LandingPage } from '@/pages/LandingPage.tsx';
-
-const navigateMock = vi.fn();
-
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof ReactRouterDom>('react-router-dom');
-
-  return {
-    ...actual,
-    useNavigate: () => navigateMock
-  };
-});
 
 vi.mock('@/features/whoop/index.ts', async () => {
   const actual = await vi.importActual<typeof whoopFeature>('@/features/whoop/index.ts');
@@ -87,22 +74,7 @@ const createControllerMock = (
 
 describe('LandingPage', () => {
   beforeEach(() => {
-    navigateMock.mockReset();
     useWhoopCaptureControllerMock.mockReturnValue(createControllerMock());
-  });
-
-  it('navigates to analysis from CTA', async () => {
-    const user = userEvent.setup();
-
-    render(
-      <ThemeProvider theme={createTheme()}>
-        <LandingPage />
-      </ThemeProvider>
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Open Analysis Workspace' }));
-
-    expect(navigateMock).toHaveBeenCalledWith(APP_ROUTES.analysis);
   });
 
   it('renders WHOOP capture panel and invokes connect action', async () => {
