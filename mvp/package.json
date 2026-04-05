@@ -65,6 +65,7 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
+    "fake-indexeddb": "^6.2.5",
     "jsdom": "^29.0.1",
     "lint-staged": "^15.5.0",
     "prettier": "^3.5.3",

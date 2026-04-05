@@ -27,6 +27,136 @@
   color: var(--froop-text-muted);
 }
 
+.capturePanel {
+  border: 1px solid var(--froop-border-strong);
+  background:
+    linear-gradient(180deg, rgba(68, 216, 255, 0.08), transparent 24%),
+    linear-gradient(180deg, var(--froop-surface-2), var(--froop-surface-1));
+  padding: clamp(16px, 3vw, 28px);
+  display: grid;
+  gap: 14px;
+}
+
+.captureTitle {
+  text-transform: uppercase;
+}
+
+.captureStatus {
+  color: var(--froop-text-muted);
+}
+
+.captureGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.captureCard {
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.captureCardTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: 0.04em;
+}
+
+.capabilityList {
+  display: grid;
+  gap: 8px;
+}
+
+.capabilityRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--froop-border-soft);
+  background: color-mix(in srgb, var(--froop-surface-2) 72%, transparent);
+}
+
+.factsList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.factsList div {
+  border: 1px solid var(--froop-border-soft);
+  background: color-mix(in srgb, var(--froop-surface-2) 74%, transparent);
+  padding: 10px;
+}
+
+.factsList dt {
+  margin-bottom: 4px;
+  color: var(--froop-text-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.factsList dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.monoCell {
+  font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+}
+
+.packetMeta {
+  color: var(--froop-text-muted);
+}
+
+.packetPreview {
+  margin: 0;
+  min-height: 132px;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--froop-border-soft);
+  background: #0f1217;
+  color: #ecf0f3;
+  padding: 10px;
+  font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.progressMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.progressBar {
+  height: 10px;
+  border: 1px solid var(--froop-border-soft);
+
+  :global(.MuiLinearProgress-bar) {
+    background: linear-gradient(90deg, #44d8ff, #d7ff2f);
+  }
+}
+
+.logList {
+  display: grid;
+  gap: 8px;
+}
+
+.logList p {
+  border: 1px solid var(--froop-border-soft);
+  background: color-mix(in srgb, var(--froop-surface-2) 74%, transparent);
+  padding: 8px;
+  font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .metricsGrid {
   display: grid;
   gap: 14px;
@@ -39,6 +169,12 @@
   padding: 18px;
   display: grid;
   gap: 8px;
+}
+
+@media (max-width: 1100px) {
+  .captureGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {
