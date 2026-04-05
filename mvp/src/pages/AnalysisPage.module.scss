@@ -1,0 +1,55 @@
+.page {
+  display: grid;
+  gap: 18px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.treePanel {
+  padding: 14px;
+  align-self: start;
+}
+
+.panelLabel {
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: 0.06em;
+}
+
+.tabPanel {
+  padding: 8px;
+  overflow: hidden;
+}
+
+.tabContent {
+  padding: 16px;
+}
+
+.kpiGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.gridBlock {
+  border: 1px solid var(--froop-border-soft);
+}
+
+.chartBlock {
+  border: 1px solid var(--froop-border-soft);
+  background: var(--froop-surface-2);
+  padding: 12px;
+}
+
+@media (max-width: 1080px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .kpiGrid {
+    grid-template-columns: 1fr;
+  }
+}

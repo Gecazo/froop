@@ -1,7 +1,0 @@
-[workspace]
-members = [
-    "crates/froop-core",
-    "crates/froop-wasm",
-]
-resolver = "2"
-

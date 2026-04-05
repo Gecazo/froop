@@ -1,5 +1,0 @@
--- +postgres
-ALTER TABLE heart_rate ADD COLUMN IF NOT EXISTS spo2 DOUBLE PRECISION NULL;
-
--- +sqlite
-ALTER TABLE heart_rate ADD COLUMN spo2 DOUBLE NULL;
