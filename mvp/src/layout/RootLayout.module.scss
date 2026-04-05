@@ -1,0 +1,83 @@
+.shell {
+  min-height: 100vh;
+  background:
+    linear-gradient(90deg, rgba(215, 255, 47, 0.06) 1px, transparent 1px) 0 0 / 22px 22px,
+    var(--froop-surface-0);
+}
+
+.drawerPaper {
+  overflow-x: hidden;
+  border-right: 1px solid var(--froop-border-strong);
+  background: linear-gradient(180deg, var(--froop-surface-2), var(--froop-surface-1));
+}
+
+.brandBlock {
+  min-height: 84px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+
+.brandMark {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  background: var(--froop-accent);
+  color: #0b1002;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.brandTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.brandSubtitle {
+  color: var(--froop-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.mainColumn {
+  min-height: 100vh;
+  transition: margin-left 220ms ease;
+}
+
+.topBar {
+  min-height: 64px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--froop-border-soft);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  background: color-mix(in srgb, var(--froop-surface-0) 86%, transparent);
+}
+
+.topBarTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.contentPane {
+  padding: 24px;
+}
+
+@media (max-width: 900px) {
+  .contentPane {
+    padding: 16px;
+  }
+
+  .topBarTitle {
+    display: none;
+  }
+}

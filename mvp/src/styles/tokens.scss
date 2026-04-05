@@ -1,0 +1,18 @@
+:root {
+  --froop-accent: #d7ff2f;
+  --froop-surface-0: #0e1013;
+  --froop-surface-1: #151a20;
+  --froop-surface-2: #1b2128;
+  --froop-border-soft: #36414d;
+  --froop-border-strong: #4b5661;
+  --froop-text-muted: #b7c1cc;
+}
+
+:root[data-theme-mode='light'] {
+  --froop-surface-0: #eceff2;
+  --froop-surface-1: #f4f6f8;
+  --froop-surface-2: #ffffff;
+  --froop-border-soft: #9da7b2;
+  --froop-border-strong: #6c7783;
+  --froop-text-muted: #46515d;
+}

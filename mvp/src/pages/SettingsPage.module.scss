@@ -1,0 +1,16 @@
+.page {
+  display: grid;
+  gap: 12px;
+  max-width: 960px;
+}
+
+.formPanel {
+  padding: clamp(14px, 2.3vw, 24px);
+  background:
+    linear-gradient(180deg, rgba(215, 255, 47, 0.06), transparent 22%), var(--froop-surface-2);
+}
+
+.form {
+  display: grid;
+  gap: 16px;
+}
