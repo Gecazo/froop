@@ -24,17 +24,17 @@ const transportMocks = vi.hoisted(() => {
 
 const storageMocks = vi.hoisted(() => {
   return {
-    countHistoryReadingsForSession: vi.fn(),
-    countPacketsForSession: vi.fn(),
-    createSession: vi.fn(),
+    countHistoryReadingsForDevice: vi.fn(),
+    countPacketsForDevice: vi.fn(),
     exportSession: vi.fn(),
-    getHistoryReadingUnixMsForSession: vi.fn(),
-    getLatestIncompleteSession: vi.fn(),
+    getHistoryReadingUnixMsForDevice: vi.fn(),
+    getLatestSession: vi.fn(),
+    getSessionByDeviceKey: vi.fn(),
     markSessionCompleted: vi.fn(),
+    openOrCreateSession: vi.fn(),
     storeHistoryReadings: vi.fn(),
     storePackets: vi.fn(),
-    touchSession: vi.fn(),
-    updateSessionDeviceName: vi.fn()
+    touchSession: vi.fn()
   };
 });
 
@@ -57,17 +57,17 @@ vi.mock('@/features/whoop/whoop.ts', () => {
 
 vi.mock('@/features/whoop/storage.ts', () => {
   return {
-    countHistoryReadingsForSession: storageMocks.countHistoryReadingsForSession,
-    countPacketsForSession: storageMocks.countPacketsForSession,
-    createSession: storageMocks.createSession,
+    countHistoryReadingsForDevice: storageMocks.countHistoryReadingsForDevice,
+    countPacketsForDevice: storageMocks.countPacketsForDevice,
     exportSession: storageMocks.exportSession,
-    getHistoryReadingUnixMsForSession: storageMocks.getHistoryReadingUnixMsForSession,
-    getLatestIncompleteSession: storageMocks.getLatestIncompleteSession,
+    getHistoryReadingUnixMsForDevice: storageMocks.getHistoryReadingUnixMsForDevice,
+    getLatestSession: storageMocks.getLatestSession,
+    getSessionByDeviceKey: storageMocks.getSessionByDeviceKey,
     markSessionCompleted: storageMocks.markSessionCompleted,
+    openOrCreateSession: storageMocks.openOrCreateSession,
     storeHistoryReadings: storageMocks.storeHistoryReadings,
     storePackets: storageMocks.storePackets,
-    touchSession: storageMocks.touchSession,
-    updateSessionDeviceName: storageMocks.updateSessionDeviceName
+    touchSession: storageMocks.touchSession
   };
 });
 
@@ -75,6 +75,7 @@ type ConnectOptions = {
   onLog: (message: string) => void;
   onNotification: (notification: WhoopNotification) => void;
   onDisconnected: () => void;
+  onDeviceSelected?: (selection: { name: string; deviceKey: string }) => Promise<void> | void;
 };
 
 const SUPPORT_OVERRIDE = {
@@ -84,12 +85,12 @@ const SUPPORT_OVERRIDE = {
   indexedDb: true
 } as const;
 
-const createSessionRecord = (id: string): SessionRecord => {
+const createSessionRecord = (deviceKey: string): SessionRecord => {
   return {
-    id,
+    deviceKey,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
-    deviceName: 'Pending WHOOP device',
+    deviceName: 'WHOOP Test Strap',
     status: 'in_progress'
   };
 };
@@ -104,30 +105,30 @@ describe('useWhoopCaptureController', () => {
 
     transportMocks.connectToWhoop.mockReset();
 
-    storageMocks.countHistoryReadingsForSession.mockReset();
-    storageMocks.countPacketsForSession.mockReset();
-    storageMocks.createSession.mockReset();
+    storageMocks.countHistoryReadingsForDevice.mockReset();
+    storageMocks.countPacketsForDevice.mockReset();
     storageMocks.exportSession.mockReset();
-    storageMocks.getHistoryReadingUnixMsForSession.mockReset();
-    storageMocks.getLatestIncompleteSession.mockReset();
+    storageMocks.getHistoryReadingUnixMsForDevice.mockReset();
+    storageMocks.getLatestSession.mockReset();
+    storageMocks.getSessionByDeviceKey.mockReset();
     storageMocks.markSessionCompleted.mockReset();
+    storageMocks.openOrCreateSession.mockReset();
     storageMocks.storeHistoryReadings.mockReset();
     storageMocks.storePackets.mockReset();
     storageMocks.touchSession.mockReset();
-    storageMocks.updateSessionDeviceName.mockReset();
 
-    storageMocks.createSession.mockResolvedValue(createSessionRecord('session-1'));
-    storageMocks.getLatestIncompleteSession.mockResolvedValue(null);
-    storageMocks.countPacketsForSession.mockResolvedValue(0);
-    storageMocks.countHistoryReadingsForSession.mockResolvedValue(0);
-    storageMocks.getHistoryReadingUnixMsForSession.mockResolvedValue([]);
+    storageMocks.openOrCreateSession.mockResolvedValue(createSessionRecord('whoop-device-1'));
+    storageMocks.getSessionByDeviceKey.mockResolvedValue(null);
+    storageMocks.getLatestSession.mockResolvedValue(null);
+    storageMocks.countPacketsForDevice.mockResolvedValue(0);
+    storageMocks.countHistoryReadingsForDevice.mockResolvedValue(0);
+    storageMocks.getHistoryReadingUnixMsForDevice.mockResolvedValue([]);
     storageMocks.storePackets.mockResolvedValue(undefined);
     storageMocks.storeHistoryReadings.mockResolvedValue(undefined);
     storageMocks.touchSession.mockResolvedValue(undefined);
-    storageMocks.updateSessionDeviceName.mockResolvedValue(undefined);
     storageMocks.markSessionCompleted.mockResolvedValue(undefined);
     storageMocks.exportSession.mockResolvedValue({
-      session: createSessionRecord('session-1'),
+      session: createSessionRecord('whoop-device-1'),
       packets: [],
       historyReadings: []
     });
@@ -144,13 +145,19 @@ describe('useWhoopCaptureController', () => {
     const disconnectMock = vi.fn();
     const sendHistoryEndAckMock = vi.fn(() => Promise.resolve());
 
-    transportMocks.connectToWhoop.mockImplementation((options: ConnectOptions) => {
+    transportMocks.connectToWhoop.mockImplementation(async (options: ConnectOptions) => {
       options.onLog('Connected to the WHOOP BLE service.');
-      return Promise.resolve({
+      await options.onDeviceSelected?.({
         name: 'WHOOP Test Strap',
+        deviceKey: 'whoop-device-1'
+      });
+
+      return {
+        name: 'WHOOP Test Strap',
+        deviceKey: 'whoop-device-1',
         disconnect: disconnectMock,
         sendHistoryEndAck: sendHistoryEndAckMock
-      });
+      };
     });
 
     const { result, unmount } = renderHook(() =>
@@ -164,14 +171,15 @@ describe('useWhoopCaptureController', () => {
     });
 
     expect(transportMocks.connectToWhoop).toHaveBeenCalledTimes(1);
-    expect(storageMocks.updateSessionDeviceName).toHaveBeenCalledWith(
-      'session-1',
+    expect(storageMocks.openOrCreateSession).toHaveBeenCalledWith(
+      'whoop-device-1',
       'WHOOP Test Strap'
     );
 
     await waitFor(() => {
       expect(result.current.connected).toBe(true);
       expect(result.current.session?.deviceName).toBe('WHOOP Test Strap');
+      expect(result.current.session?.deviceKey).toBe('whoop-device-1');
     });
 
     await act(async () => {
@@ -188,13 +196,19 @@ describe('useWhoopCaptureController', () => {
     let notify: ((notification: WhoopNotification) => void) | undefined;
     const sendHistoryEndAckMock = vi.fn(() => Promise.resolve());
 
-    transportMocks.connectToWhoop.mockImplementation((options: ConnectOptions) => {
-      notify = options.onNotification;
-      return Promise.resolve({
+    transportMocks.connectToWhoop.mockImplementation(async (options: ConnectOptions) => {
+      await options.onDeviceSelected?.({
         name: 'WHOOP Test Strap',
+        deviceKey: 'whoop-device-1'
+      });
+      notify = options.onNotification;
+
+      return {
+        name: 'WHOOP Test Strap',
+        deviceKey: 'whoop-device-1',
         disconnect: vi.fn(),
         sendHistoryEndAck: sendHistoryEndAckMock
-      });
+      };
     });
 
     const { result, unmount } = renderHook(() =>
@@ -239,7 +253,7 @@ describe('useWhoopCaptureController', () => {
     });
 
     await waitFor(() => {
-      expect(storageMocks.markSessionCompleted).toHaveBeenCalledWith('session-1');
+      expect(storageMocks.markSessionCompleted).toHaveBeenCalledWith('whoop-device-1');
     });
 
     unmount();
@@ -250,13 +264,18 @@ describe('useWhoopCaptureController', () => {
 
     let notify: ((notification: WhoopNotification) => void) | undefined;
 
-    transportMocks.connectToWhoop.mockImplementation((options: ConnectOptions) => {
-      notify = options.onNotification;
-      return Promise.resolve({
+    transportMocks.connectToWhoop.mockImplementation(async (options: ConnectOptions) => {
+      await options.onDeviceSelected?.({
         name: 'WHOOP Test Strap',
+        deviceKey: 'whoop-device-1'
+      });
+      notify = options.onNotification;
+      return {
+        name: 'WHOOP Test Strap',
+        deviceKey: 'whoop-device-1',
         disconnect: vi.fn(),
         sendHistoryEndAck: vi.fn(() => Promise.resolve())
-      });
+      };
     });
 
     const { result, unmount } = renderHook(() =>
@@ -304,11 +323,36 @@ describe('useWhoopCaptureController', () => {
     expect(storageMocks.storePackets).toHaveBeenCalledTimes(1);
 
     const flushedReadings = storageMocks.storeHistoryReadings.mock.calls[0]?.[0] as
-      | Array<{ unixMs: number }>
+      | Array<{ unixMs: number; deviceKey: string }>
       | undefined;
 
     expect(flushedReadings).toHaveLength(1);
     expect(flushedReadings?.[0]?.unixMs).toBe(1735689600000);
+    expect(flushedReadings?.[0]?.deviceKey).toBe('whoop-device-1');
+
+    unmount();
+  });
+
+  it('fails fast when browser does not expose device key', async () => {
+    transportMocks.connectToWhoop.mockRejectedValue(
+      new Error(
+        'Browser did not expose a stable WHOOP device identifier. Enable Bluetooth device identifiers for this site and try again.'
+      )
+    );
+
+    const { result, unmount } = renderHook(() =>
+      useWhoopCaptureController({
+        support: SUPPORT_OVERRIDE
+      })
+    );
+
+    await act(async () => {
+      await result.current.connect();
+    });
+
+    expect(result.current.connected).toBe(false);
+    expect(result.current.status).toContain('did not expose a WHOOP device key');
+    expect(storageMocks.openOrCreateSession).not.toHaveBeenCalled();
 
     unmount();
   });

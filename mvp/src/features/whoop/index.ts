@@ -21,17 +21,18 @@ export {
   type WhoopNotification
 } from '@/features/whoop/whoop.ts';
 export {
-  countHistoryReadingsForSession,
-  countPacketsForSession,
-  createSession,
+  countHistoryReadingsForDevice,
+  countPacketsForDevice,
   exportSession,
-  getHistoryReadingUnixMsForSession,
-  getLatestIncompleteSession,
+  getHistoryReadingUnixMsForDevice,
+  getLatestSession,
   markSessionCompleted,
+  openOrCreateSession,
   storeHistoryReading,
   storeHistoryReadings,
   storePacket,
   storePackets,
+  getSessionByDeviceKey,
   touchSession,
   updateSessionDeviceName,
   type HistoryReadingRecord,
