@@ -62,6 +62,7 @@ type BluetoothGattServerLike = {
 };
 
 type BluetoothDeviceLike = {
+  id?: string;
   name?: string;
   gatt?: BluetoothGattLike | null;
   addEventListener: (type: 'gattserverdisconnected', listener: () => void) => void;
@@ -105,6 +106,12 @@ export const connectToWhoop = async (
     filters: [{ services: [WHOOP_SERVICE_UUID] }],
     optionalServices: [WHOOP_SERVICE_UUID]
   });
+
+  if (typeof device.id === 'string' && device.id.length > 0) {
+    console.info('[WHOOP] Browser device identifier:', device.id);
+  } else {
+    console.info('[WHOOP] Browser did not expose a device identifier for this device.');
+  }
 
   options.onLog(`Selected ${device.name ?? 'Unnamed WHOOP device'}.`);
 
