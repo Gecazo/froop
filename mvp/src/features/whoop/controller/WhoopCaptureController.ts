@@ -458,6 +458,8 @@ export class WhoopCaptureController {
         unixMs: item.unixMs,
         bpm: item.bpm,
         rr: item.rr,
+        sensor_data: item.sensor_data,
+        imu_data: item.imu_data,
         receivedAt: new Date().toISOString()
       });
       this.state.earliestReadingUnixMs =

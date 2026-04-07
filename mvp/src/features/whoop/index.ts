@@ -12,8 +12,10 @@ export {
 export {
   WhoopProtocolDecoder,
   type DecodedWhoopData,
+  type ImuSample,
   type HistoryMetadata,
-  type HistoryReading
+  type HistoryReading,
+  type SensorData
 } from '@/features/whoop/decoder.ts';
 export {
   connectToWhoop,

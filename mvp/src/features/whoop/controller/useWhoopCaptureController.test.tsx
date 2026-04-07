@@ -295,7 +295,9 @@ describe('useWhoopCaptureController', () => {
           version: 11,
           unixMs: 1735689600000,
           bpm: 61,
-          rr: [800]
+          rr: [800],
+          sensor_data: null,
+          imu_data: []
         }
       ])
       .mockReturnValueOnce([
@@ -304,7 +306,9 @@ describe('useWhoopCaptureController', () => {
           version: 11,
           unixMs: 1735689600000,
           bpm: 61,
-          rr: [800]
+          rr: [800],
+          sensor_data: null,
+          imu_data: []
         }
       ]);
 
@@ -323,12 +327,14 @@ describe('useWhoopCaptureController', () => {
     expect(storageMocks.storePackets).toHaveBeenCalledTimes(1);
 
     const flushedReadings = storageMocks.storeHistoryReadings.mock.calls[0]?.[0] as
-      | Array<{ unixMs: number; deviceKey: string }>
+      | Array<{ unixMs: number; deviceKey: string; sensor_data: null; imu_data: unknown[] }>
       | undefined;
 
     expect(flushedReadings).toHaveLength(1);
     expect(flushedReadings?.[0]?.unixMs).toBe(1735689600000);
     expect(flushedReadings?.[0]?.deviceKey).toBe('whoop-device-1');
+    expect(flushedReadings?.[0]?.sensor_data).toBeNull();
+    expect(flushedReadings?.[0]?.imu_data).toEqual([]);
 
     unmount();
   });

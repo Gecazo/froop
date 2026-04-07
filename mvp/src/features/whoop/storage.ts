@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+import type { ImuSample, SensorData } from '@/features/whoop/decoder.ts';
 
 export type SessionRecord = {
   deviceKey: string;
@@ -23,6 +24,8 @@ export type HistoryReadingRecord = {
   unixMs: number;
   bpm: number;
   rr: number[];
+  sensor_data: SensorData | null;
+  imu_data: ImuSample[];
   receivedAt: string;
 };
 
