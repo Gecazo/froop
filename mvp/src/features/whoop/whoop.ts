@@ -105,7 +105,9 @@ export const connectToWhoop = async (
   }
 
   const device = await bluetooth.requestDevice({
-    filters: [{ services: [WHOOP_SERVICE_UUID] }],
+    filters: [{ services: [
+        WHOOP_SERVICE_UUID
+      ] }],
     optionalServices: [WHOOP_SERVICE_UUID]
   });
 

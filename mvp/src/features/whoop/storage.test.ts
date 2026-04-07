@@ -11,8 +11,7 @@ import {
   markSessionCompleted,
   openOrCreateSession,
   storeHistoryReadings,
-  storePackets,
-  updateSessionDeviceName
+  storePackets
 } from '@/features/whoop/storage.ts';
 
 const deleteDb = async (): Promise<void> => {
@@ -31,7 +30,7 @@ describe('whoop storage', () => {
 
   it('stores sessions, packets, readings, and exports payloads', async () => {
     const session = await openOrCreateSession('whoop-device-1', 'WHOOP 5');
-    await updateSessionDeviceName(session.deviceKey, 'WHOOP Pulse 5');
+    await openOrCreateSession(session.deviceKey, 'WHOOP Pulse 5');
 
     await storePackets([
       {

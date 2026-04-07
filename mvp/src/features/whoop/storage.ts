@@ -32,6 +32,34 @@ export type SessionExportPayload = {
   historyReadings: HistoryReadingRecord[];
 };
 
+export interface SessionStorage {
+  openOrCreate(deviceKey: string, deviceName: string): Promise<SessionRecord>;
+  touch(deviceKey: string): Promise<void>;
+  markCompleted(deviceKey: string): Promise<void>;
+  getByDeviceKey(deviceKey: string): Promise<SessionRecord | undefined>;
+  getLatest(): Promise<SessionRecord | null>;
+}
+
+export interface PacketStorage {
+  storeMany(packets: PacketRecord[]): Promise<void>;
+  countForDevice(deviceKey: string): Promise<number>;
+  listForDevice(deviceKey: string): Promise<PacketRecord[]>;
+}
+
+export interface HistoryReadingStorage {
+  storeMany(readings: HistoryReadingRecord[]): Promise<void>;
+  countForDevice(deviceKey: string): Promise<number>;
+  listForDevice(deviceKey: string): Promise<HistoryReadingRecord[]>;
+  listUnixMsForDevice(deviceKey: string): Promise<number[]>;
+}
+
+export interface WhoopStorage {
+  sessions: SessionStorage;
+  packets: PacketStorage;
+  historyReadings: HistoryReadingStorage;
+  exportSession(deviceKey: string): Promise<SessionExportPayload>;
+}
+
 const DB_NAME = 'froop';
 const DB_VERSION = 3;
 const PRIMARY_KEY_MIGRATION_ERROR = 'Not yet support for changing primary key';
@@ -58,6 +86,7 @@ class FroopDb extends Dexie {
 
 const db = new FroopDb();
 let dbOpenPromise: Promise<void> | null = null;
+const nowIso = (): string => new Date().toISOString();
 
 const hasPrimaryKeyUpgradeError = (error: unknown): boolean => {
   if (!(error instanceof Error)) {
@@ -105,142 +134,174 @@ const ensureDbReady = async (): Promise<void> => {
   await dbOpenPromise;
 };
 
-const sessionRepository = {
-  async openOrCreate(deviceKey: string, deviceName: string): Promise<SessionRecord> {
-    await ensureDbReady();
+const withDb = async <T>(run: (database: FroopDb) => Promise<T>): Promise<T> => {
+  await ensureDbReady();
+  return run(db);
+};
 
-    return db.transaction('rw', db.sessions, async () => {
-      const now = new Date().toISOString();
-      const existing = await db.sessions.get(deviceKey);
-      const session: SessionRecord = existing
-        ? {
-            ...existing,
-            deviceName,
-            updatedAt: now,
-            status: 'in_progress'
-          }
-        : {
-            deviceKey,
-            createdAt: now,
-            updatedAt: now,
-            deviceName,
-            status: 'in_progress'
-          };
-
-      await db.sessions.put(session);
-      return session;
-    });
-  },
-
-  async updateDeviceName(deviceKey: string, deviceName: string): Promise<void> {
-    await ensureDbReady();
-
-    return db.transaction('rw', db.sessions, async () => {
-      const existing = await db.sessions.get(deviceKey);
+const updateExistingSession = async (
+  deviceKey: string,
+  update: (existing: SessionRecord) => SessionRecord
+): Promise<void> => {
+  await withDb(async (database) => {
+    await database.transaction('rw', database.sessions, async () => {
+      const existing = await database.sessions.get(deviceKey);
       if (!existing) {
-        throw new Error(`Session for device ${deviceKey} was not found.`);
+        return;
       }
 
-      await db.sessions.put({
-        ...existing,
-        deviceName,
-        updatedAt: new Date().toISOString()
+      await database.sessions.put(update(existing));
+    });
+  });
+};
+
+const sessionStorage: SessionStorage = {
+  async openOrCreate(deviceKey: string, deviceName: string): Promise<SessionRecord> {
+    return withDb(async (database) => {
+      return database.transaction('rw', database.sessions, async () => {
+        const now = nowIso();
+        const existing = await database.sessions.get(deviceKey);
+        const session: SessionRecord = existing
+          ? {
+              ...existing,
+              deviceName,
+              updatedAt: now,
+              status: 'in_progress'
+            }
+          : {
+              deviceKey,
+              createdAt: now,
+              updatedAt: now,
+              deviceName,
+              status: 'in_progress'
+            };
+
+        await database.sessions.put(session);
+        return session;
       });
     });
   },
 
   async touch(deviceKey: string): Promise<void> {
-    await ensureDbReady();
-
-    return db.transaction('rw', db.sessions, async () => {
-      const existing = await db.sessions.get(deviceKey);
-      if (!existing) {
-        return;
-      }
-
-      await db.sessions.put({
+    await updateExistingSession(deviceKey, (existing) => {
+      return {
         ...existing,
-        updatedAt: new Date().toISOString()
-      });
+        updatedAt: nowIso()
+      };
     });
   },
 
   async markCompleted(deviceKey: string): Promise<void> {
-    await ensureDbReady();
-
-    return db.transaction('rw', db.sessions, async () => {
-      const existing = await db.sessions.get(deviceKey);
-      if (!existing) {
-        return;
-      }
-
-      await db.sessions.put({
+    await updateExistingSession(deviceKey, (existing) => {
+      return {
         ...existing,
         status: 'completed',
-        updatedAt: new Date().toISOString()
-      });
+        updatedAt: nowIso()
+      };
     });
   },
 
   async getByDeviceKey(deviceKey: string): Promise<SessionRecord | undefined> {
-    await ensureDbReady();
-    return db.sessions.get(deviceKey);
+    return withDb(async (database) => database.sessions.get(deviceKey));
   },
 
   async getLatest(): Promise<SessionRecord | null> {
-    await ensureDbReady();
-    const latest = await db.sessions.orderBy('updatedAt').reverse().first();
-    return latest ?? null;
+    return withDb(async (database) => {
+      const latest = await database.sessions.orderBy('updatedAt').reverse().first();
+      return latest ?? null;
+    });
   }
 };
 
-const packetRepository = {
+const packetStorage: PacketStorage = {
   async storeMany(packets: PacketRecord[]): Promise<void> {
-    await ensureDbReady();
-
     if (packets.length === 0) {
       return;
     }
 
-    await db.rawPackets.bulkAdd(packets);
+    await withDb(async (database) => {
+      await database.rawPackets.bulkAdd(packets);
+    });
   },
 
   async countForDevice(deviceKey: string): Promise<number> {
-    await ensureDbReady();
-    return db.rawPackets.where('deviceKey').equals(deviceKey).count();
+    return withDb(async (database) => database.rawPackets.where('deviceKey').equals(deviceKey).count());
   },
 
   async listForDevice(deviceKey: string): Promise<PacketRecord[]> {
-    await ensureDbReady();
-    return db.rawPackets
-      .where('[deviceKey+receivedAt]')
-      .between([deviceKey, Dexie.minKey], [deviceKey, Dexie.maxKey])
-      .toArray();
+    return withDb(async (database) => {
+      return database.rawPackets
+        .where('[deviceKey+receivedAt]')
+        .between([deviceKey, Dexie.minKey], [deviceKey, Dexie.maxKey])
+        .toArray();
+    });
   }
 };
 
-const historyReadingRepository = {
+const historyReadingStorage: HistoryReadingStorage = {
   async storeMany(readings: HistoryReadingRecord[]): Promise<void> {
-    await ensureDbReady();
-
     if (readings.length === 0) {
       return;
     }
 
-    await db.historyReadings.bulkAdd(readings);
+    await withDb(async (database) => {
+      await database.historyReadings.bulkAdd(readings);
+    });
   },
 
   async countForDevice(deviceKey: string): Promise<number> {
-    await ensureDbReady();
-    return db.historyReadings.where('deviceKey').equals(deviceKey).count();
+    return withDb(async (database) =>
+      database.historyReadings.where('deviceKey').equals(deviceKey).count()
+    );
   },
 
   async listForDevice(deviceKey: string): Promise<HistoryReadingRecord[]> {
-    await ensureDbReady();
-    return db.historyReadings
-      .where('[deviceKey+unixMs]')
-      .between([deviceKey, Dexie.minKey], [deviceKey, Dexie.maxKey])
-      .toArray();
+    return withDb(async (database) => {
+      return database.historyReadings
+        .where('[deviceKey+unixMs]')
+        .between([deviceKey, Dexie.minKey], [deviceKey, Dexie.maxKey])
+        .toArray();
+    });
+  },
+
+  async listUnixMsForDevice(deviceKey: string): Promise<number[]> {
+    const readings = await this.listForDevice(deviceKey);
+    return readings.map((reading) => reading.unixMs);
+  }
+};
+
+export const whoopStorage: WhoopStorage = {
+  sessions: sessionStorage,
+  packets: packetStorage,
+  historyReadings: historyReadingStorage,
+  async exportSession(deviceKey: string): Promise<SessionExportPayload> {
+    return withDb(async (database) => {
+      return database.transaction(
+        'r',
+        database.sessions,
+        database.rawPackets,
+        database.historyReadings,
+        async (): Promise<SessionExportPayload> => {
+          const [session, packets, historyReadings] = await Promise.all([
+            database.sessions.get(deviceKey),
+            database.rawPackets
+              .where('[deviceKey+receivedAt]')
+              .between([deviceKey, Dexie.minKey], [deviceKey, Dexie.maxKey])
+              .toArray(),
+            database.historyReadings
+              .where('[deviceKey+unixMs]')
+              .between([deviceKey, Dexie.minKey], [deviceKey, Dexie.maxKey])
+              .toArray()
+          ]);
+
+          return {
+            session,
+            packets,
+            historyReadings
+          };
+        }
+      );
+    });
   }
 };
 
@@ -248,82 +309,46 @@ export const openOrCreateSession = async (
   deviceKey: string,
   deviceName: string
 ): Promise<SessionRecord> => {
-  return sessionRepository.openOrCreate(deviceKey, deviceName);
-};
-
-export const updateSessionDeviceName = async (
-  deviceKey: string,
-  deviceName: string
-): Promise<void> => {
-  await sessionRepository.updateDeviceName(deviceKey, deviceName);
+  return whoopStorage.sessions.openOrCreate(deviceKey, deviceName);
 };
 
 export const touchSession = async (deviceKey: string): Promise<void> => {
-  await sessionRepository.touch(deviceKey);
+  await whoopStorage.sessions.touch(deviceKey);
 };
 
 export const markSessionCompleted = async (deviceKey: string): Promise<void> => {
-  await sessionRepository.markCompleted(deviceKey);
+  await whoopStorage.sessions.markCompleted(deviceKey);
 };
 
 export const getLatestSession = async (): Promise<SessionRecord | null> => {
-  return sessionRepository.getLatest();
+  return whoopStorage.sessions.getLatest();
 };
 
 export const getSessionByDeviceKey = async (deviceKey: string): Promise<SessionRecord | null> => {
-  const session = await sessionRepository.getByDeviceKey(deviceKey);
+  const session = await whoopStorage.sessions.getByDeviceKey(deviceKey);
   return session ?? null;
 };
 
-export const storePacket = async (packet: PacketRecord): Promise<void> => {
-  await storePackets([packet]);
-};
-
-export const storeHistoryReading = async (reading: HistoryReadingRecord): Promise<void> => {
-  await storeHistoryReadings([reading]);
-};
-
 export const storePackets = async (packets: PacketRecord[]): Promise<void> => {
-  await packetRepository.storeMany(packets);
+  await whoopStorage.packets.storeMany(packets);
 };
 
 export const storeHistoryReadings = async (readings: HistoryReadingRecord[]): Promise<void> => {
-  await historyReadingRepository.storeMany(readings);
+  await whoopStorage.historyReadings.storeMany(readings);
 };
 
 export const countPacketsForDevice = async (deviceKey: string): Promise<number> => {
-  return packetRepository.countForDevice(deviceKey);
+  return whoopStorage.packets.countForDevice(deviceKey);
 };
 
 export const countHistoryReadingsForDevice = async (deviceKey: string): Promise<number> => {
-  return historyReadingRepository.countForDevice(deviceKey);
+  return whoopStorage.historyReadings.countForDevice(deviceKey);
 };
 
 export const getHistoryReadingUnixMsForDevice = async (deviceKey: string): Promise<number[]> => {
-  const readings = await historyReadingRepository.listForDevice(deviceKey);
-  return readings.map((reading) => reading.unixMs);
+  return whoopStorage.historyReadings.listUnixMsForDevice(deviceKey);
 };
 
 export const exportSession = async (deviceKey: string): Promise<SessionExportPayload> => {
-  await ensureDbReady();
-
-  return db.transaction(
-    'r',
-    db.sessions,
-    db.rawPackets,
-    db.historyReadings,
-    async (): Promise<SessionExportPayload> => {
-      const [session, packets, historyReadings] = await Promise.all([
-        sessionRepository.getByDeviceKey(deviceKey),
-        packetRepository.listForDevice(deviceKey),
-        historyReadingRepository.listForDevice(deviceKey)
-      ]);
-
-      return {
-        session,
-        packets,
-        historyReadings
-      };
-    }
-  );
+  return whoopStorage.exportSession(deviceKey);
 };

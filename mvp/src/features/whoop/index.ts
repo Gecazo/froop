@@ -28,15 +28,17 @@ export {
   getLatestSession,
   markSessionCompleted,
   openOrCreateSession,
-  storeHistoryReading,
   storeHistoryReadings,
-  storePacket,
   storePackets,
   getSessionByDeviceKey,
   touchSession,
-  updateSessionDeviceName,
+  whoopStorage,
   type HistoryReadingRecord,
   type PacketRecord,
+  type HistoryReadingStorage,
+  type PacketStorage,
   type SessionExportPayload,
-  type SessionRecord
+  type SessionRecord,
+  type SessionStorage,
+  type WhoopStorage
 } from '@/features/whoop/storage.ts';
