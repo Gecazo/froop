@@ -12,8 +12,10 @@ export {
 export {
   WhoopProtocolDecoder,
   type DecodedWhoopData,
+  type ImuSample,
   type HistoryMetadata,
-  type HistoryReading
+  type HistoryReading,
+  type SensorData
 } from '@/features/whoop/decoder.ts';
 export {
   connectToWhoop,
@@ -21,21 +23,24 @@ export {
   type WhoopNotification
 } from '@/features/whoop/whoop.ts';
 export {
-  countHistoryReadingsForSession,
-  countPacketsForSession,
-  createSession,
+  countHistoryReadingsForDevice,
+  countPacketsForDevice,
   exportSession,
-  getHistoryReadingUnixMsForSession,
-  getLatestIncompleteSession,
+  getHistoryReadingUnixMsForDevice,
+  getLatestSession,
   markSessionCompleted,
-  storeHistoryReading,
+  openOrCreateSession,
   storeHistoryReadings,
-  storePacket,
   storePackets,
+  getSessionByDeviceKey,
   touchSession,
-  updateSessionDeviceName,
+  whoopStorage,
   type HistoryReadingRecord,
   type PacketRecord,
+  type HistoryReadingStorage,
+  type PacketStorage,
   type SessionExportPayload,
-  type SessionRecord
+  type SessionRecord,
+  type SessionStorage,
+  type WhoopStorage
 } from '@/features/whoop/storage.ts';

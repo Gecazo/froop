@@ -12,6 +12,19 @@ const MetadataType = {
   HistoryComplete: 3
 } as const;
 
+const MIN_PACKET_LEN_FOR_IMU = 1188;
+const IMU_AXIS_OFFSET_ACC_X = 85;
+const IMU_AXIS_OFFSET_ACC_Y = 285;
+const IMU_AXIS_OFFSET_ACC_Z = 485;
+const IMU_AXIS_OFFSET_GYR_X = 688;
+const IMU_AXIS_OFFSET_GYR_Y = 888;
+const IMU_AXIS_OFFSET_GYR_Z = 1088;
+const IMU_SAMPLES_PER_AXIS = 100;
+const IMU_ACC_SENSITIVITY = 1875;
+const IMU_GYR_SENSITIVITY = 15;
+const IMU_BASE_HEADER_OFFSET = 20;
+const LEGACY_ACTIVITY_BYTES = 4;
+
 type PartialPacket = {
   packetType: number;
   seq: number;
@@ -20,12 +33,38 @@ type PartialPacket = {
   data: number[];
 };
 
+export type SensorData = {
+  ppg_green: number;
+  ppg_red_ir: number;
+  spo2_red: number;
+  spo2_ir: number;
+  skin_temp_raw: number;
+  ambient_light: number;
+  led_drive_1: number;
+  led_drive_2: number;
+  resp_rate_raw: number;
+  signal_quality: number;
+  skin_contact: number;
+  accel_gravity: [number, number, number];
+};
+
+export type ImuSample = {
+  acc_x_g: number;
+  acc_y_g: number;
+  acc_z_g: number;
+  gyr_x_dps: number;
+  gyr_y_dps: number;
+  gyr_z_dps: number;
+};
+
 export type HistoryReading = {
   kind: 'history_reading';
   version: number;
   unixMs: number;
   bpm: number;
   rr: number[];
+  sensor_data: SensorData | null;
+  imu_data: ImuSample[];
 };
 
 export type HistoryMetadata = {
@@ -186,6 +225,10 @@ const decodeMetadata = (packet: DecodedWhoopPacket): HistoryMetadata | null => {
 };
 
 const decodeHistorical = (packet: DecodedWhoopPacket): HistoryReading | null => {
+  if (packet.payload.length >= MIN_PACKET_LEN_FOR_IMU) {
+    return decodeHistoricalWithImu(packet);
+  }
+
   if (packet.payload.length >= 77 && (packet.seq === 12 || packet.seq === 24)) {
     return decodeHistoricalV12(packet);
   }
@@ -233,7 +276,9 @@ const decodeHistoricalGeneric = (packet: DecodedWhoopPacket): HistoryReading | n
     version: packet.seq,
     unixMs,
     bpm,
-    rr
+    rr,
+    sensor_data: null,
+    imu_data: []
   };
 };
 
@@ -264,13 +309,141 @@ const decodeHistoricalV12 = (packet: DecodedWhoopPacket): HistoryReading | null 
     }
   }
 
+  const skinContact = packet.payload[48];
+  const gravity = readGravityVector(packet.payload);
+  if (skinContact === undefined || gravity === null) {
+    return null;
+  }
+
+  const sensor_data: SensorData = {
+    ppg_green: readU16Le(packet.payload, 26) ?? 0,
+    ppg_red_ir: readU16Le(packet.payload, 28) ?? 0,
+    spo2_red: readU16Le(packet.payload, 61) ?? 0,
+    spo2_ir: readU16Le(packet.payload, 63) ?? 0,
+    skin_temp_raw: readU16Le(packet.payload, 65) ?? 0,
+    ambient_light: readU16Le(packet.payload, 67) ?? 0,
+    led_drive_1: readU16Le(packet.payload, 69) ?? 0,
+    led_drive_2: readU16Le(packet.payload, 71) ?? 0,
+    resp_rate_raw: readU16Le(packet.payload, 73) ?? 0,
+    signal_quality: readU16Le(packet.payload, 75) ?? 0,
+    skin_contact: skinContact,
+    accel_gravity: gravity
+  };
+
   return {
     kind: 'history_reading',
     version: packet.seq,
     unixMs,
     bpm,
-    rr
+    rr,
+    sensor_data,
+    imu_data: []
   };
+};
+
+const decodeHistoricalWithImu = (packet: DecodedWhoopPacket): HistoryReading | null => {
+  if (packet.payload.length < MIN_PACKET_LEN_FOR_IMU) {
+    return null;
+  }
+
+  const unix = readU32Le(packet.payload, 4);
+  const bpm = packet.payload[14];
+  const rrCount = packet.payload[15];
+  if (unix === null || bpm === undefined || rrCount === undefined) {
+    return null;
+  }
+
+  const rr: number[] = [];
+  let cursor = 16;
+  for (let index = 0; index < rrCount; index += 1) {
+    const value = readU16Le(packet.payload, cursor);
+    if (value === null) {
+      return null;
+    }
+    cursor += 2;
+    if (value !== 0) {
+      rr.push(value);
+    }
+  }
+
+  if (rr.length !== rrCount) {
+    return null;
+  }
+
+  cursor += LEGACY_ACTIVITY_BYTES;
+
+  const headerOffset = IMU_BASE_HEADER_OFFSET + rr.length * 2;
+  const imuPacketData = packet.payload.slice(cursor);
+
+  const accXRaw = readImuAxis(imuPacketData, IMU_AXIS_OFFSET_ACC_X, headerOffset);
+  const accYRaw = readImuAxis(imuPacketData, IMU_AXIS_OFFSET_ACC_Y, headerOffset);
+  const accZRaw = readImuAxis(imuPacketData, IMU_AXIS_OFFSET_ACC_Z, headerOffset);
+  const gyrXRaw = readImuAxis(imuPacketData, IMU_AXIS_OFFSET_GYR_X, headerOffset);
+  const gyrYRaw = readImuAxis(imuPacketData, IMU_AXIS_OFFSET_GYR_Y, headerOffset);
+  const gyrZRaw = readImuAxis(imuPacketData, IMU_AXIS_OFFSET_GYR_Z, headerOffset);
+
+  if (
+    accXRaw === null ||
+    accYRaw === null ||
+    accZRaw === null ||
+    gyrXRaw === null ||
+    gyrYRaw === null ||
+    gyrZRaw === null
+  ) {
+    return null;
+  }
+
+  const imu_data: ImuSample[] = [];
+  for (let index = 0; index < IMU_SAMPLES_PER_AXIS; index += 1) {
+    imu_data.push({
+      acc_x_g: accXRaw[index]! / IMU_ACC_SENSITIVITY,
+      acc_y_g: accYRaw[index]! / IMU_ACC_SENSITIVITY,
+      acc_z_g: accZRaw[index]! / IMU_ACC_SENSITIVITY,
+      gyr_x_dps: gyrXRaw[index]! / IMU_GYR_SENSITIVITY,
+      gyr_y_dps: gyrYRaw[index]! / IMU_GYR_SENSITIVITY,
+      gyr_z_dps: gyrZRaw[index]! / IMU_GYR_SENSITIVITY
+    });
+  }
+
+  return {
+    kind: 'history_reading',
+    version: packet.seq,
+    unixMs: unix * 1000,
+    bpm,
+    rr,
+    sensor_data: null,
+    imu_data
+  };
+};
+
+const readImuAxis = (
+  data: readonly number[],
+  axisOffset: number,
+  headerOffset: number
+): number[] | null => {
+  const axis: number[] = [];
+  for (let index = 0; index < IMU_SAMPLES_PER_AXIS; index += 1) {
+    const start = axisOffset - headerOffset + index * 2;
+    const value = readI16Be(data, start);
+    if (value === null) {
+      return null;
+    }
+
+    axis.push(value);
+  }
+
+  return axis;
+};
+
+const readGravityVector = (data: readonly number[]): [number, number, number] | null => {
+  const x = readF32Le(data, 33);
+  const y = readF32Le(data, 37);
+  const z = readF32Le(data, 41);
+  if (x === null || y === null || z === null) {
+    return null;
+  }
+
+  return [x, y, z];
 };
 
 const readU16Le = (data: readonly number[], offset: number): number | null => {
@@ -281,6 +454,17 @@ const readU16Le = (data: readonly number[], offset: number): number | null => {
   }
 
   return first | (second << 8);
+};
+
+const readI16Be = (data: readonly number[], offset: number): number | null => {
+  const first = data[offset];
+  const second = data[offset + 1];
+  if (first === undefined || second === undefined) {
+    return null;
+  }
+
+  const value = (first << 8) | second;
+  return (value << 16) >> 16;
 };
 
 const readU32Le = (data: readonly number[], offset: number): number | null => {
@@ -298,6 +482,25 @@ const readU32Le = (data: readonly number[], offset: number): number | null => {
   }
 
   return (first | (second << 8) | (third << 16) | ((fourth << 24) >>> 0)) >>> 0;
+};
+
+const readF32Le = (data: readonly number[], offset: number): number | null => {
+  const first = data[offset];
+  const second = data[offset + 1];
+  const third = data[offset + 2];
+  const fourth = data[offset + 3];
+  if (
+    first === undefined ||
+    second === undefined ||
+    third === undefined ||
+    fourth === undefined
+  ) {
+    return null;
+  }
+
+  const bytes = Uint8Array.from([first, second, third, fourth]);
+  const view = new DataView(bytes.buffer);
+  return view.getFloat32(0, true);
 };
 
 const crc8 = (data: Uint8Array): number => {

@@ -1,19 +1,19 @@
 import { WhoopProtocolDecoder, type DecodedWhoopData } from '@/features/whoop/decoder.ts';
 import {
-  countHistoryReadingsForSession,
-  countPacketsForSession,
-  createSession,
+  countHistoryReadingsForDevice,
+  countPacketsForDevice,
   exportSession,
-  getHistoryReadingUnixMsForSession,
-  getLatestIncompleteSession,
+  getHistoryReadingUnixMsForDevice,
+  getLatestSession,
   markSessionCompleted,
+  getSessionByDeviceKey,
+  openOrCreateSession,
   storeHistoryReadings,
   storePackets,
   touchSession,
   type HistoryReadingRecord,
   type PacketRecord,
-  type SessionRecord,
-  updateSessionDeviceName
+  type SessionRecord
 } from '@/features/whoop/storage.ts';
 import {
   connectToWhoop,
@@ -206,21 +206,6 @@ export class WhoopCaptureController {
     this.emit();
 
     try {
-      const session =
-        resumeExisting && this.state.resumableSession
-          ? this.state.resumableSession
-          : await createSession('Pending WHOOP device');
-      await this.activateSession(session, resumeExisting);
-      this.pushLog(
-        resumeExisting
-          ? `Resuming local session ${session.id}.`
-          : `Created local session ${session.id}.`
-      );
-      this.pushDebug(
-        resumeExisting ? `Resuming session ${session.id}` : `Created session ${session.id}`
-      );
-      this.emit();
-
       const connectedDevice = await connectToWhoop({
         onLog: (line) => {
           if (this.destroyed) {
@@ -249,6 +234,25 @@ export class WhoopCaptureController {
           this.pushLog('The strap disconnected from the browser.');
           this.pushDebug('State -> disconnected');
           this.scheduleRender();
+        },
+        onDeviceSelected: async ({ name, deviceKey }) => {
+          const existingSession = await getSessionByDeviceKey(deviceKey);
+          const session = await openOrCreateSession(deviceKey, name);
+          await this.activateSession(session, existingSession !== null);
+
+          if (existingSession) {
+            this.pushLog(
+              resumeExisting
+                ? `Resuming WHOOP stream ${session.deviceKey}.`
+                : `Appending to existing WHOOP stream ${session.deviceKey}.`
+            );
+            this.pushDebug(`Using existing stream ${session.deviceKey}`);
+          } else {
+            this.pushLog(`Created WHOOP stream ${session.deviceKey}.`);
+            this.pushDebug(`Created stream ${session.deviceKey}`);
+          }
+
+          this.emit();
         }
       });
 
@@ -257,20 +261,23 @@ export class WhoopCaptureController {
         return;
       }
 
-      await updateSessionDeviceName(session.id, connectedDevice.name);
+      if (!this.state.session) {
+        const fallbackSession = await openOrCreateSession(
+          connectedDevice.deviceKey,
+          connectedDevice.name
+        );
+        await this.activateSession(fallbackSession, true);
+      }
 
       this.device = connectedDevice;
       this.state.connected = true;
-      this.state.session = {
-        ...session,
-        deviceName: connectedDevice.name,
-        status: 'in_progress'
-      };
       this.state.resumableSession = this.state.session;
       this.state.protocolState = 'connected';
       this.setStatus(`Connected to ${connectedDevice.name}. Listening for notifications.`);
-      this.pushLog(`Session ${session.id} is now linked to ${connectedDevice.name}.`);
-      this.pushDebug(`State -> connected (${connectedDevice.name})`);
+      this.pushLog(
+        `WHOOP stream ${connectedDevice.deviceKey} is now connected as ${connectedDevice.name}.`
+      );
+      this.pushDebug(`State -> connected (${connectedDevice.name}, ${connectedDevice.deviceKey})`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown connection error.';
       const guidance = explainBluetoothError(message);
@@ -279,7 +286,9 @@ export class WhoopCaptureController {
       this.pushLog(`Connection failed: ${message}`);
       this.pushDebug(`Connection failed: ${message}`);
       if (this.state.session && !this.state.connected) {
-        this.pushLog(`Session ${this.state.session.id} ended before connection completed.`);
+        this.pushLog(
+          `WHOOP stream ${this.state.session.deviceKey} ended before connection completed.`
+        );
       }
       if (guidance.log) {
         this.pushLog(guidance.log);
@@ -317,18 +326,18 @@ export class WhoopCaptureController {
 
     await this.flushBuffers();
 
-    const payload = await exportSession(this.state.session.id);
+    const payload = await exportSession(this.state.session.deviceKey);
     const file = new Blob([JSON.stringify(payload, null, 2)], {
       type: 'application/json'
     });
     const url = URL.createObjectURL(file);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `froop-session-${this.state.session.id}.json`;
+    anchor.download = `froop-device-${this.state.session.deviceKey}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
 
-    this.pushLog(`Exported session ${this.state.session.id} as JSON.`);
+    this.pushLog(`Exported WHOOP stream ${this.state.session.deviceKey} as JSON.`);
     this.setStatus('Session export downloaded.');
     this.emit();
   }
@@ -409,7 +418,7 @@ export class WhoopCaptureController {
     }
 
     this.pendingPackets.push({
-      sessionId: this.state.session.id,
+      deviceKey: this.state.session.deviceKey,
       characteristic: notification.characteristic,
       bytes: notification.bytes,
       receivedAt: new Date().toISOString()
@@ -444,11 +453,13 @@ export class WhoopCaptureController {
 
       this.seenReadingUnixMs.add(item.unixMs);
       this.pendingHistoryReadings.push({
-        sessionId: this.state.session.id,
+        deviceKey: this.state.session.deviceKey,
         version: item.version,
         unixMs: item.unixMs,
         bpm: item.bpm,
         rr: item.rr,
+        sensor_data: item.sensor_data,
+        imu_data: item.imu_data,
         receivedAt: new Date().toISOString()
       });
       this.state.earliestReadingUnixMs =
@@ -473,17 +484,17 @@ export class WhoopCaptureController {
       this.state.lastAckChunk = `${item.data}`;
       this.pushLog(`Sent history_end acknowledgement for chunk ${item.data}.`);
       this.pushDebug(`Acked HistoryEnd chunk ${item.data}`);
-      await touchSession(this.state.session.id);
+      await touchSession(this.state.session.deviceKey);
     }
 
     if (item.cmd === 'HistoryComplete') {
       await this.flushBuffers();
-      await markSessionCompleted(this.state.session.id);
+      await markSessionCompleted(this.state.session.deviceKey);
       this.state.historyComplete = true;
       this.state.protocolState = 'complete';
       this.state.resumableSession = null;
-      this.pushLog(`Session ${this.state.session.id} marked complete.`);
-      this.pushDebug(`State -> complete for session ${this.state.session.id}`);
+      this.pushLog(`WHOOP stream ${this.state.session.deviceKey} marked complete.`);
+      this.pushDebug(`State -> complete for stream ${this.state.session.deviceKey}`);
     }
   }
 
@@ -569,7 +580,7 @@ export class WhoopCaptureController {
     this.flushInFlight = (async () => {
       await Promise.all([storePackets(packets), storeHistoryReadings(historyReadings)]);
       if (this.state.session) {
-        await touchSession(this.state.session.id);
+        await touchSession(this.state.session.deviceKey);
       }
     })();
 
@@ -604,9 +615,9 @@ export class WhoopCaptureController {
     }
 
     const [packetCount, historyReadingCount, unixMsValues] = await Promise.all([
-      countPacketsForSession(session.id),
-      countHistoryReadingsForSession(session.id),
-      getHistoryReadingUnixMsForSession(session.id)
+      countPacketsForDevice(session.deviceKey),
+      countHistoryReadingsForDevice(session.deviceKey),
+      getHistoryReadingUnixMsForDevice(session.deviceKey)
     ]);
 
     this.state.packetCount = packetCount;
@@ -619,7 +630,7 @@ export class WhoopCaptureController {
   }
 
   private async loadResumableSession(): Promise<void> {
-    this.state.resumableSession = await getLatestIncompleteSession();
+    this.state.resumableSession = await getLatestSession();
     this.scheduleRender();
   }
 
@@ -795,6 +806,15 @@ const explainBluetoothError = (message: string): { status: string; log?: string 
         'Web Bluetooth is disabled in this browser context. Open the app in full Chrome, Edge, or Brave on desktop and try again.',
       log:
         'If needed, check chrome://settings/content/bluetoothDevices and chrome://flags/#enable-experimental-web-platform-features.'
+    };
+  }
+
+  if (normalized.includes('stable whoop device identifier')) {
+    return {
+      status:
+        'Chrome did not expose a WHOOP device key for this connection. Allow Bluetooth device identifiers for this site and try again.',
+      log:
+        'Recovery: in Chrome site settings for this app, allow Bluetooth devices and persistent identifiers, then reload and reconnect.'
     };
   }
 

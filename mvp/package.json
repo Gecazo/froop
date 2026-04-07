@@ -38,6 +38,7 @@
     "@mui/x-data-grid": "^8.0.0",
     "@mui/x-tree-view": "^8.0.0",
     "@reduxjs/toolkit": "^2.8.2",
+    "dexie": "^4.4.2",
     "notistack": "^3.0.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

@@ -102,8 +102,8 @@ export const LandingPage = () => {
                 <dd>{whoop.historyReadingCount}</dd>
               </div>
               <div>
-                <dt>Session ID</dt>
-                <dd className={styles.monoCell}>{whoop.session?.id ?? 'None'}</dd>
+                <dt>Device key</dt>
+                <dd className={styles.monoCell}>{whoop.session?.deviceKey ?? 'None'}</dd>
               </div>
               <div>
                 <dt>Resume available</dt>

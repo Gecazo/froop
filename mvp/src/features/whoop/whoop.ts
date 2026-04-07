@@ -62,6 +62,7 @@ type BluetoothGattServerLike = {
 };
 
 type BluetoothDeviceLike = {
+  id?: string;
   name?: string;
   gatt?: BluetoothGattLike | null;
   addEventListener: (type: 'gattserverdisconnected', listener: () => void) => void;
@@ -81,6 +82,7 @@ export type WhoopNotification = {
 
 export type ConnectedWhoopDevice = {
   name: string;
+  deviceKey: string;
   disconnect: () => void;
   sendHistoryEndAck: (data: number) => Promise<void>;
 };
@@ -89,6 +91,7 @@ type ConnectOptions = {
   onLog: (message: string) => void;
   onNotification: (notification: WhoopNotification) => void;
   onDisconnected: () => void;
+  onDeviceSelected?: (selection: { name: string; deviceKey: string }) => Promise<void> | void;
 };
 
 export const connectToWhoop = async (
@@ -102,11 +105,30 @@ export const connectToWhoop = async (
   }
 
   const device = await bluetooth.requestDevice({
-    filters: [{ services: [WHOOP_SERVICE_UUID] }],
+    filters: [{ services: [
+        WHOOP_SERVICE_UUID
+      ] }],
     optionalServices: [WHOOP_SERVICE_UUID]
   });
 
-  options.onLog(`Selected ${device.name ?? 'Unnamed WHOOP device'}.`);
+  if (typeof device.id !== 'string' || device.id.length === 0) {
+    throw new Error(
+      'Browser did not expose a stable WHOOP device identifier. Enable Bluetooth device identifiers for this site and try again.'
+    );
+  }
+
+  const deviceKey = device.id;
+  const deviceName = device.name ?? 'WHOOP';
+
+  console.info('[WHOOP] Browser device identifier:', deviceKey);
+  options.onLog(`Selected ${deviceName}.`);
+
+  if (options.onDeviceSelected) {
+    await options.onDeviceSelected({
+      name: deviceName,
+      deviceKey
+    });
+  }
 
   const server = await device.gatt?.connect();
   if (!server) {
@@ -172,7 +194,8 @@ export const connectToWhoop = async (
   );
 
   return {
-    name: device.name ?? 'WHOOP',
+    name: deviceName,
+    deviceKey,
     disconnect: () => {
       if (device.gatt?.connected) {
         device.gatt.disconnect();
